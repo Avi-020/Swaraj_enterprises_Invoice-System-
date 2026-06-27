@@ -12,22 +12,22 @@
 //    (replace 'YOUR_APPS_SCRIPT_URL_HERE')
 // ══════════════════════════════════════════════════════════════════════════════
 
-const SHEET_NAME = 'Invoices';
+const SHEET_NAME = "Swaraj Invoice DB";
 
 const HEADERS = [
-  'Invoice No',
-  'Invoice Date',
-  'Buyer Name',
-  'Buyer GSTIN',
-  'PO Number',
-  'PO Date',
-  'Items',
-  'Subtotal',
-  'CGST',
-  'SGST',
-  'Round Off',
-  'Grand Total',
-  'Saved At',
+  "Invoice No",
+  "Invoice Date",
+  "Buyer Name",
+  "Buyer GSTIN",
+  "PO Number",
+  "PO Date",
+  "Items",
+  "Subtotal",
+  "CGST",
+  "SGST",
+  "Round Off",
+  "Grand Total",
+  "Saved At",
 ];
 
 function doPost(e) {
@@ -42,46 +42,45 @@ function doPost(e) {
       sheet.appendRow(HEADERS);
       // Style header row
       const headerRange = sheet.getRange(1, 1, 1, HEADERS.length);
-      headerRange.setBackground('#1e3a5f');
-      headerRange.setFontColor('#ffffff');
-      headerRange.setFontWeight('bold');
+      headerRange.setBackground("#1e3a5f");
+      headerRange.setFontColor("#ffffff");
+      headerRange.setFontWeight("bold");
       sheet.setFrozenRows(1);
     }
 
     // Append invoice row
     sheet.appendRow([
-      data.invoiceNo    || '',
-      data.invoiceDate  || '',
-      data.buyerName    || '',
-      data.buyerGstin   || '',
-      data.poNumber     || '',
-      data.poDate       || '',
-      data.items        || '',
-      Number(data.subtotal   || 0),
-      Number(data.cgst       || 0),
-      Number(data.sgst       || 0),
-      Number(data.roundOff   || 0),
+      data.invoiceNo || "",
+      data.invoiceDate || "",
+      data.buyerName || "",
+      data.buyerGstin || "",
+      data.poNumber || "",
+      data.poDate || "",
+      data.items || "",
+      Number(data.subtotal || 0),
+      Number(data.cgst || 0),
+      Number(data.sgst || 0),
+      Number(data.roundOff || 0),
       Number(data.grandTotal || 0),
-      data.savedAt      || new Date().toISOString(),
+      data.savedAt || new Date().toISOString(),
     ]);
 
     // Auto-resize columns
     sheet.autoResizeColumns(1, HEADERS.length);
 
-    return ContentService
-      .createTextOutput(JSON.stringify({ success: true }))
-      .setMimeType(ContentService.MimeType.JSON);
-
+    return ContentService.createTextOutput(
+      JSON.stringify({ success: true }),
+    ).setMimeType(ContentService.MimeType.JSON);
   } catch (err) {
-    return ContentService
-      .createTextOutput(JSON.stringify({ success: false, error: err.message }))
-      .setMimeType(ContentService.MimeType.JSON);
+    return ContentService.createTextOutput(
+      JSON.stringify({ success: false, error: err.message }),
+    ).setMimeType(ContentService.MimeType.JSON);
   }
 }
 
 // Test by running this function manually in Apps Script editor
 function testSetup() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  Logger.log('Sheet name: ' + ss.getName());
-  Logger.log('Setup looks good!');
+  Logger.log("Sheet name: " + ss.getName());
+  Logger.log("Setup looks good!");
 }
