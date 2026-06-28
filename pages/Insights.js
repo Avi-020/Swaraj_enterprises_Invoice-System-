@@ -41,8 +41,19 @@ function parseItems(itemsStr) {
 function parseDate(str) {
   if (!str) return null;
   const s = String(str).trim();
+
+  // Excel serial number (e.g. 46200) — convert to JS date
+  // Excel epoch is Jan 1 1900; JS epoch is Jan 1 1970
+  const num = Number(s);
+  if (!isNaN(num) && num > 40000 && num < 60000) {
+    // Excel date serial to JS date
+    return new Date((num - 25569) * 86400 * 1000);
+  }
+
+  // DD-MM-YYYY or DD/MM/YYYY
   const m = s.match(/(\d{1,2})[-\/](\d{1,2})[-\/](\d{4})/);
   if (m) return new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]));
+
   const d = new Date(s);
   return isNaN(d) ? null : d;
 }
@@ -82,27 +93,25 @@ function computeInsights(rows) {
     new Date(now.getFullYear(), now.getMonth() - 1, 1),
   );
 
-  // Revenue by month
   const revenueByMonth = {};
   const invoicesByMonth = {};
   const productQty = {};
   const productRevenue = {};
   const buyerRevenue = {};
-  const buyerCount = {};
 
   let totalRevenue = 0;
-  let totalInvoices = rows.length;
+  const totalInvoices = rows.length;
 
   for (const row of rows) {
-    if (rows.indexOf(row) === 0) {
-      const sample = String(row["Items"] || "");
-      console.log("Raw items string:", sample);
-      console.log("Parsed items:", parseItems(sample));
-    }
-    const date = parseDate(row["Invoice Date"]);
-    const mk = monthKey(date);
+    // ── Column name fixes ──
+    // Sheet has: "Invoice Date " (trailing space), "Iteams" (typo), "Grand Total"
+    const invoiceDate = row["Invoice Date "] || row["Invoice Date"] || "";
+    const itemsStr = row["Iteams"] || row["Items"] || row["items"] || "";
     const grand = Number(row["Grand Total"]) || 0;
-    const buyer = row["Buyer Name"] || "Unknown";
+    const buyer = String(row["Buyer Name"] || "Unknown");
+
+    const date = parseDate(invoiceDate);
+    const mk = monthKey(date);
 
     totalRevenue += grand;
 
@@ -111,12 +120,10 @@ function computeInsights(rows) {
       invoicesByMonth[mk] = (invoicesByMonth[mk] || 0) + 1;
     }
 
-    // Buyer stats
     buyerRevenue[buyer] = (buyerRevenue[buyer] || 0) + grand;
-    buyerCount[buyer] = (buyerCount[buyer] || 0) + 1;
 
-    // Product stats
-    const items = parseItems(row["Items"]);
+    // Parse items
+    const items = parseItems(itemsStr);
     for (const it of items) {
       productQty[it.name] = (productQty[it.name] || 0) + it.qty;
       productRevenue[it.name] =
@@ -124,37 +131,27 @@ function computeInsights(rows) {
     }
   }
 
-  // Sort months chronologically
   const sortedMonths = Object.keys(revenueByMonth).sort();
   const last6Months = sortedMonths.slice(-6);
 
-  // Month-on-month growth
   const thisRev = revenueByMonth[thisMonth] || 0;
   const lastRev = revenueByMonth[lastMonth] || 0;
   const growth = lastRev > 0 ? ((thisRev - lastRev) / lastRev) * 100 : null;
 
-  // Next month revenue prediction — simple average of last 3 months
   const last3 = sortedMonths.slice(-3).map((k) => revenueByMonth[k] || 0);
   const predicted = last3.length
     ? Math.round(last3.reduce((a, b) => a + b, 0) / last3.length)
     : null;
 
-  // Top products by qty
   const topByQty = Object.entries(productQty)
     .sort((a, b) => b[1] - a[1])
     .slice(0, 5);
-
-  // Top products by revenue
   const topByRevenue = Object.entries(productRevenue)
     .sort((a, b) => b[1] - a[1])
     .slice(0, 5);
-
-  // Top buyers
   const topBuyers = Object.entries(buyerRevenue)
     .sort((a, b) => b[1] - a[1])
     .slice(0, 5);
-
-  // Avg invoice value
   const avgInvoice =
     totalInvoices > 0 ? Math.round(totalRevenue / totalInvoices) : 0;
 
@@ -756,7 +753,9 @@ export default function InsightsPage() {
                           {row["Invoice No"]}
                         </td>
                         <td style={{ padding: "8px 12px", color: "#64748B" }}>
-                          {row["Invoice Date"]}
+                          {String(
+                            row["Invoice Date "] || row["Invoice Date"] || "",
+                          )}
                         </td>
                         <td style={{ padding: "8px 12px", color: "#374151" }}>
                           {row["Buyer Name"]}
@@ -771,7 +770,7 @@ export default function InsightsPage() {
                           {rupee(row["Grand Total"])}
                         </td>
                         <td style={{ padding: "8px 12px", color: "#64748B" }}>
-                          {row["PO Number"] || "—"}
+                          {row["PO No"] || row["PO Number"] || "—"}
                         </td>
                       </tr>
                     ))}
