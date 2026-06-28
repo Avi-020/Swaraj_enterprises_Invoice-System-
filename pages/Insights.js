@@ -5,17 +5,38 @@ import { fetchInvoiceData } from "../lib/googleSheets";
 // Stored format: "Product A(10×₹25); Product B(5×₹100)"
 function parseItems(itemsStr) {
   if (!itemsStr) return [];
-  return itemsStr
-    .split(";")
-    .map((s) => {
-      s = s.trim();
-      const m = s.match(/^(.+)\((\d+(?:\.\d+)?)×₹([\d.]+)\)$/);
-      if (!m) return null;
-      return { name: m[1].trim(), qty: Number(m[2]), rate: Number(m[3]) };
-    })
-    .filter(Boolean);
-}
+  const str = String(itemsStr).trim();
+  if (!str || str === "undefined" || str === "null") return [];
 
+  const results = [];
+  const parts = str.split(";");
+
+  for (const part of parts) {
+    const s = part.trim();
+    if (!s) continue;
+
+    // Find the LAST opening bracket — name is everything before it
+    const openIdx = s.lastIndexOf("(");
+    const closeIdx = s.lastIndexOf(")");
+    if (openIdx === -1 || closeIdx === -1) continue;
+
+    const name = s.substring(0, openIdx).trim();
+    const inside = s.substring(openIdx + 1, closeIdx);
+
+    // Extract ALL digit sequences from inside (handles ×, ₹, x, * etc.)
+    const nums = inside.match(/\d+(?:\.\d+)?/g);
+    if (!nums || nums.length < 1) continue;
+
+    const qty = Number(nums[0]); // first number = quantity
+    const rate = nums[1] ? Number(nums[1]) : 0; // second number = rate
+
+    if (name && qty > 0) {
+      results.push({ name, qty, rate });
+    }
+  }
+
+  return results;
+}
 // ── Parse DD-MM-YYYY or DD/MM/YYYY dates ─────────────────────────────────
 function parseDate(str) {
   if (!str) return null;
@@ -73,6 +94,11 @@ function computeInsights(rows) {
   let totalInvoices = rows.length;
 
   for (const row of rows) {
+    if (rows.indexOf(row) === 0) {
+      const sample = String(row["Items"] || "");
+      console.log("Raw items string:", sample);
+      console.log("Parsed items:", parseItems(sample));
+    }
     const date = parseDate(row["Invoice Date"]);
     const mk = monthKey(date);
     const grand = Number(row["Grand Total"]) || 0;
