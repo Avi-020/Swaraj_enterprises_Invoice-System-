@@ -98,6 +98,7 @@ function computeInsights(rows) {
   const productQty = {};
   const productRevenue = {};
   const buyerRevenue = {};
+  const productBuyers = {}; // { productName: { buyerName: qty } }
 
   let totalRevenue = 0;
   const totalInvoices = rows.length;
@@ -128,6 +129,11 @@ function computeInsights(rows) {
       productQty[it.name] = (productQty[it.name] || 0) + it.qty;
       productRevenue[it.name] =
         (productRevenue[it.name] || 0) + it.qty * it.rate;
+
+      // Track per-buyer quantity for this product
+      if (!productBuyers[it.name]) productBuyers[it.name] = {};
+      productBuyers[it.name][buyer] =
+        (productBuyers[it.name][buyer] || 0) + it.qty;
     }
   }
 
@@ -169,6 +175,7 @@ function computeInsights(rows) {
     topByQty,
     topByRevenue,
     topBuyers,
+    productBuyers,
   };
 }
 
@@ -231,6 +238,7 @@ export default function InsightsPage() {
   const [insights, setInsights] = useState(null);
   const [error, setError] = useState("");
   const [rows, setRows] = useState([]);
+  const [selectedProduct, setSelectedProduct] = useState(null);
 
   useEffect(() => {
     fetchInvoiceData().then((res) => {
@@ -478,15 +486,27 @@ export default function InsightsPage() {
                 >
                   {insights.topByQty.map(([name, qty], i) => {
                     const maxQty = insights.topByQty[0][1];
+                    const isOpen = selectedProduct === name;
+                    const buyerBreakdown = insights.productBuyers[name] || {};
+                    const buyerList = Object.entries(buyerBreakdown).sort(
+                      (a, b) => b[1] - a[1],
+                    );
+                    const topBuyerQty = buyerList.length ? buyerList[0][1] : 1;
+
                     return (
                       <div key={i}>
                         <div
+                          onClick={() =>
+                            setSelectedProduct(isOpen ? null : name)
+                          }
                           style={{
                             display: "flex",
                             justifyContent: "space-between",
                             fontSize: "12px",
                             marginBottom: "3px",
+                            cursor: "pointer",
                           }}
+                          title="Click to see which company buys this most"
                         >
                           <span
                             style={{
@@ -502,16 +522,25 @@ export default function InsightsPage() {
                                   ? "🥉"
                                   : `${i + 1}.`}{" "}
                             {name}
+                            <span
+                              style={{ color: "#9CA3AF", marginLeft: "4px" }}
+                            >
+                              {isOpen ? "▲" : "▼"}
+                            </span>
                           </span>
                           <span style={{ color: "#6B7280" }}>
                             {qty.toLocaleString("en-IN")} pcs
                           </span>
                         </div>
                         <div
+                          onClick={() =>
+                            setSelectedProduct(isOpen ? null : name)
+                          }
                           style={{
                             background: "#F1F5F9",
                             borderRadius: "4px",
                             height: "6px",
+                            cursor: "pointer",
                           }}
                         >
                           <div
@@ -523,6 +552,68 @@ export default function InsightsPage() {
                             }}
                           />
                         </div>
+
+                        {/* Buyer breakdown — shown when clicked */}
+                        {/* Top 3 buyers — shown when clicked */}
+                        {isOpen && (
+                          <div
+                            style={{
+                              marginTop: "8px",
+                              marginBottom: "4px",
+                              padding: "10px",
+                              background: "#F8FAFC",
+                              borderRadius: "8px",
+                              border: "1px solid #E2E8F0",
+                            }}
+                          >
+                            <div
+                              style={{
+                                fontSize: "10px",
+                                fontWeight: "bold",
+                                color: "#64748B",
+                                marginBottom: "6px",
+                                textTransform: "uppercase",
+                                letterSpacing: "0.3px",
+                              }}
+                            >
+                              Top Buyers
+                            </div>
+                            <div
+                              style={{
+                                display: "flex",
+                                flexDirection: "column",
+                                gap: "6px",
+                              }}
+                            >
+                              {buyerList
+                                .slice(0, 3)
+                                .map(([buyerName, buyerQty], bi) => (
+                                  <div
+                                    key={bi}
+                                    style={{
+                                      display: "flex",
+                                      justifyContent: "space-between",
+                                      alignItems: "center",
+                                      fontSize: "11px",
+                                    }}
+                                  >
+                                    <span style={{ color: "#374151" }}>
+                                      {bi === 0 ? "🥇" : bi === 1 ? "🥈" : "🥉"}{" "}
+                                      {buyerName}
+                                    </span>
+                                    <span
+                                      style={{
+                                        color: "#10B981",
+                                        fontWeight: "600",
+                                      }}
+                                    >
+                                      {buyerQty.toLocaleString("en-IN")} pcs
+                                    </span>
+                                  </div>
+                                ))}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     );
                   })}

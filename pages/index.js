@@ -268,14 +268,17 @@ export default function InvoiceGenerator() {
 
   useEffect(() => {
     // Load current invoice number from localStorage on mount
-    const { getCurrentInvoiceNo: getNo } = require("../lib/googleSheets");
-    setInvoiceNo(getNo());
+    const { syncInvoiceNoWithSheets } = require("../lib/googleSheets");
+    syncInvoiceNoWithSheets().then((no) => setInvoiceNo(no));
   }, []);
   const [invoiceDate, setInvoiceDate] = useState(todayStr());
   const [poNumber, setPoNumber] = useState("");
   const [poDate, setPoDate] = useState("");
   const [dispatch, setDispatch] = useState("");
   const [destination, setDestination] = useState("");
+  const [truckNo, setTruckNo] = useState("");
+  const [buyerNameTxt, setBuyerNameTxt] = useState("");
+  const [cellNo, setCellNo] = useState("");
   const [items, setItems] = useState([emptyItem()]);
   const [showPreview, setShowPreview] = useState(false);
   const [poFile, setPoFile] = useState("");
@@ -412,7 +415,13 @@ export default function InvoiceGenerator() {
       poDate,
       buyer,
       items: validItems,
-      transportDetails: { dispatchThrough: dispatch, destination },
+      transportDetails: {
+        dispatchThrough: dispatch,
+        destination,
+        truckNo,
+        buyerNameTxt,
+        cellNo,
+      },
     };
   }
 
@@ -655,6 +664,48 @@ export default function InvoiceGenerator() {
                       className="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm"
                     />
                   </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Transport Details */}
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+              <h2 className="font-bold text-slate-800 mb-4 text-sm">
+                🚚 Transport Details (Optional)
+              </h2>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wide mb-1.5">
+                    Truck / Tempo No.
+                  </label>
+                  <input
+                    value={truckNo}
+                    onChange={(e) => setTruckNo(e.target.value)}
+                    placeholder="MH12 AB1234"
+                    className="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wide mb-1.5">
+                    Buyer Name (Contact)
+                  </label>
+                  <input
+                    value={buyerNameTxt}
+                    onChange={(e) => setBuyerNameTxt(e.target.value)}
+                    placeholder="Contact person name"
+                    className="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wide mb-1.5">
+                    Cell No.
+                  </label>
+                  <input
+                    value={cellNo}
+                    onChange={(e) => setCellNo(e.target.value)}
+                    placeholder="9876543210"
+                    className="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm"
+                  />
                 </div>
               </div>
             </div>
