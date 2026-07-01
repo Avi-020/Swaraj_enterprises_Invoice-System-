@@ -41,18 +41,32 @@ function parseItems(itemsStr) {
 function parseDate(str) {
   if (!str) return null;
   const s = String(str).trim();
+  if (!s || s === "undefined" || s === "null") return null;
 
-  // Excel serial number (e.g. 46200) — convert to JS date
-  // Excel epoch is Jan 1 1900; JS epoch is Jan 1 1970
+  // ISO datetime string like "2026-01-06T18:30:00.000Z"
+  // This is savedAt column leaking in — extract date but also
+  // check if it looks like it belongs to wrong timezone (IST offset issue)
+  const isoM = s.match(/^(\d{4})-(\d{2})-(\d{2})T/);
+  if (isoM) {
+    // Convert to IST: add 5h30m to UTC
+    const d = new Date(s);
+    const ist = new Date(d.getTime() + 5.5 * 60 * 60 * 1000);
+    return ist;
+  }
+
+  // Excel serial number (e.g. 46200)
   const num = Number(s);
   if (!isNaN(num) && num > 40000 && num < 60000) {
-    // Excel date serial to JS date
     return new Date((num - 25569) * 86400 * 1000);
   }
 
   // DD-MM-YYYY or DD/MM/YYYY
   const m = s.match(/(\d{1,2})[-\/](\d{1,2})[-\/](\d{4})/);
   if (m) return new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]));
+
+  // YYYY-MM-DD (no time)
+  const ymd = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (ymd) return new Date(Number(ymd[1]), Number(ymd[2]) - 1, Number(ymd[3]));
 
   const d = new Date(s);
   return isNaN(d) ? null : d;
@@ -106,7 +120,15 @@ function computeInsights(rows) {
   for (const row of rows) {
     // ── Column name fixes ──
     // Sheet has: "Invoice Date " (trailing space), "Iteams" (typo), "Grand Total"
-    const invoiceDate = row["Invoice Date "] || row["Invoice Date"] || "";
+    // Try all possible column names — "Invoice Date" (with/without trailing space)
+    // Explicitly exclude ISO timestamps from the savedAt column
+    let invoiceDate =
+      row["Invoice Date "] || row["Invoice Date"] || row["invoiceDate"] || "";
+    invoiceDate = String(invoiceDate).trim();
+    // If it looks like a savedAt ISO string (has T and Z and wrong month), skip it
+    // by checking if Invoice Date column itself has a non-ISO value
+    const savedAt = String(row["Saved At"] || row["savedAt"] || "");
+    if (invoiceDate && invoiceDate === savedAt) invoiceDate = ""; // don't use savedAt as date
     const itemsStr = row["Iteams"] || row["Items"] || row["items"] || "";
     const grand = Number(row["Grand Total"]) || 0;
     const buyer = String(row["Buyer Name"] || "Unknown");
@@ -139,7 +161,9 @@ function computeInsights(rows) {
 
   const sortedMonths = Object.keys(revenueByMonth).sort();
   const last6Months = sortedMonths.slice(-6);
-
+  console.log("Current month:", thisMonth);
+  console.log("Revenue map:", revenueByMonth);
+  console.log("Current month revenue:", revenueByMonth[thisMonth]);
   const thisRev = revenueByMonth[thisMonth] || 0;
   const lastRev = revenueByMonth[lastMonth] || 0;
   const growth = lastRev > 0 ? ((thisRev - lastRev) / lastRev) * 100 : null;
@@ -251,6 +275,7 @@ export default function InsightsPage() {
       } else {
         setRows(res.rows);
         setInsights(computeInsights(res.rows));
+        console.log("response :", res.rows);
       }
       setLoading(false);
     });
@@ -844,9 +869,21 @@ export default function InsightsPage() {
                           {row["Invoice No"]}
                         </td>
                         <td style={{ padding: "8px 12px", color: "#64748B" }}>
-                          {String(
-                            row["Invoice Date "] || row["Invoice Date"] || "",
-                          )}
+                          {(() => {
+                            const raw = String(
+                              row["Invoice Date "] || row["Invoice Date"] || "",
+                            );
+                            // If it's an ISO string, format it nicely as DD-MM-YYYY
+                            const isoM = raw.match(/^(\d{4})-(\d{2})-(\d{2})T/);
+                            if (isoM) {
+                              const d = new Date(raw);
+                              const ist = new Date(
+                                d.getTime() + 5.5 * 60 * 60 * 1000,
+                              );
+                              return `${String(ist.getDate()).padStart(2, "0")}-${String(ist.getMonth() + 1).padStart(2, "0")}-${ist.getFullYear()}`;
+                            }
+                            return raw;
+                          })()}
                         </td>
                         <td style={{ padding: "8px 12px", color: "#374151" }}>
                           {row["Buyer Name"]}
